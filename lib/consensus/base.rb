@@ -40,16 +40,17 @@ module Consensus
     def handle_connection(conn)
       _, port, host = conn.peeraddr
 
+      async.listen_to(handshake(conn), conn)
+    end
+
+    def handshake(conn)
       wait_readable conn
-
-      node_id = conn.readline.strip.to_i
-
-      puts "#{node_id} is now connected to #{@node_id}"
-
-      async.listen_to(node_id, conn)
+      conn.readline.strip.to_i
     end
 
     def listen_to(node_id, conn)
+      puts "#{node_id} is now connected to #{@node_id}"
+
       loop do
         begin
           wait_readable conn
@@ -67,20 +68,16 @@ module Consensus
     def handle_message_from(node_id, data)
       from = @state.node(node_id)
 
-      if @state.leader
-        puts "Leader is Node #{@state.leader.id}"
-      end
-
       puts "Node #{node_id} -> Node #{@node_id}: #{data}"
       puts
 
       case data
       when "PING"
-        from.notify!(@state.current_node, "PONG")
+        from.async.notify!(@state.current_node, "PONG")
       when "PONG"
         @health_checker.async.report(node_id)
       when "ALIVE?"
-        from.notify!(@state.current_node, "FINETHANKS")
+        from.async.notify!(@state.current_node, "FINETHANKS")
         @election.async.start
       when "FINETHANKS"
         @election.async.inc_response_counter

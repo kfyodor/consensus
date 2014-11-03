@@ -1,7 +1,4 @@
-require 'consensus/log'
-
 module Consensus
-
   class Node
     include Celluloid::IO
     include Comparable
@@ -21,8 +18,7 @@ module Consensus
         wait_writable @socket
         @socket.puts data
       end
-    rescue => e
-      # puts "Error while notyfying node #{id}"
+    rescue
     end
 
     def <=>(node)
