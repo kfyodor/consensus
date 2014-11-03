@@ -20,12 +20,8 @@ module Consensus
     end
 
     def start
-      trap(:INT) { close }
-
       tick
-
-      start_election!
-
+      async.start_election!
       run
     end    
 
