@@ -1,26 +1,49 @@
+require 'consensus/log'
+
 module Consensus
-  require 'consensus/log'
 
   class Node
-    attr_reader :id, :host, :port
+    include Celluloid::IO
+    include Comparable
 
-    # state_machine
+    attr_reader :id, :host, :port, :socket
 
-    def initialize(id, cluster, opts = {})
+    def initialize(id, opts = {})
       @id      = id.to_i
-      @cluster = cluster
-      @log     = Log.new
+      @host    = opts["host"].to_s
+      @port    = opts["port"].to_i
     end
 
-    def start_election
+    def notify!(sender, data)
+      open_socket(sender)
+
+      if @socket
+        wait_writable @socket
+        @socket.puts data
+      end
+    rescue => e
+      # puts e
+      # puts "Error while notyfying node #{id}"
     end
 
-    def leader?
-      id == @cluster.leader.id
+    def <=>(node)
+      id <=> node.id
     end
 
-    def follower?
-      !leader?
+    def close_socket!
+      @socket.close if @socket
+      @socket = nil
+    end
+
+    private
+
+    def open_socket(sender)
+      @socket ||= begin
+        TCPSocket.new(@host, @port).tap do |s|
+          wait_writable s
+          s.puts sender.id
+        end rescue nil
+      end
     end
   end
 end

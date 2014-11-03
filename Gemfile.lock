@@ -7,11 +7,14 @@ GEM
       celluloid (>= 0.16.0)
       nio4r (>= 1.0.0)
     hitimes (1.2.2)
+    hitimes (1.2.2-java)
     nio4r (1.0.1)
+    nio4r (1.0.1-java)
     timers (4.0.1)
       hitimes
 
 PLATFORMS
+  java
   ruby
 
 DEPENDENCIES
