@@ -22,7 +22,6 @@ module Consensus
         @socket.puts data
       end
     rescue => e
-      # puts e
       # puts "Error while notyfying node #{id}"
     end
 

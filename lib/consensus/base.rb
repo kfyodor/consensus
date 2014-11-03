@@ -7,42 +7,29 @@ module Consensus
     include Celluloid::IO
 
     def initialize(node_id, opts = {})
-      @node_id          = node_id
-      @timeout          = opts[:timeout] || 1
-      @state            = State.new(@node_id)
-      @ticks_count      = 0
-      @election_counter = 0
-      @response_counter = {}
-      @health_response  = {}
+      @node_id = node_id
+      @interval = opts[:interval] || 1
+      @timeout  = opts[:timeout]  || 4
+
+      State.supervise_as :state, @node_id
+      @state = Celluloid::Actor[:state]
+
+      HealthChecker.supervise_as :health, @interval, @timeout
+      @health_checker = Celluloid::Actor[:health]
+
+      Election.supervise_as :election
+      @election = Celluloid::Actor[:election]
+
 
       parse_config
       start_server
     end
 
     def start
-      tick
-      async.start_election!
+      @health_checker.async.run
+      @election.async.start
       run
     end    
-
-    def tick
-      n = 4
-
-      every(@timeout) do
-        @ticks_count += 1
-
-        if !@state.election? && !@state.current_node_is_leader?
-          @state.check_leader_health
-
-          if @ticks_count >= n && @health_response.values_at(*((@ticks_count - n)..(@ticks_count - 1)).to_a).compact.any?
-            @health_response.delete(@ticks_count - n) # we don't want this to grow
-          else
-            puts "Node #{@state.current_node.id} has't heard from the leader for a while..."
-            start_election!
-          end
-        end
-      end
-    end
 
     def run
       loop do
@@ -91,47 +78,15 @@ module Consensus
       when "PING"
         from.notify!(@state.current_node, "PONG")
       when "PONG"
-        @health_response[@ticks_count] = true
+        @health_checker.async.report(node_id)
       when "ALIVE?"
         from.notify!(@state.current_node, "FINETHANKS")
-        start_election!
+        @election.async.start
       when "FINETHANKS"
-        @response_counter[@election_counter]  += 1
+        @election.async.inc_response_counter
       when "IMTHEKING"
-        stop_election!(from)
+        @election.async.stop(from)
       end
-    end
-
-    def start_election!
-      puts "Starting election."
-
-      @state.leader = nil
-
-      @election_counter += 1
-      @response_counter[@election_counter] = 0
-
-      older_nodes = @state.older_nodes
-
-      if older_nodes.empty?
-        @state.broadcast("IMTHEKING")
-        stop_election!(@state.current_node)
-      else
-        older_nodes.each do |node|
-          node.notify! @state.current_node, "ALIVE?"
-        end
-
-        after(@timeout) do
-          if @response_counter[@election_counter] == 0
-            @state.broadcast("IMTHEKING")
-            stop_election!(@state.current_node)
-          end
-        end
-      end
-    end
-
-    def stop_election!(new_leader)
-      puts "Leader is set to Node #{new_leader.id}"
-      @state.leader = new_leader
     end
 
     def close

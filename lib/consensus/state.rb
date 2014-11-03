@@ -4,7 +4,7 @@ module Consensus
   class State
     include Celluloid
 
-    attr_accessor :leader
+    attr_reader :leader
 
     def initialize(node_id)
       @node_id = node_id.freeze
@@ -31,7 +31,7 @@ module Consensus
 
     def broadcast(data)
       nodes.each do |n|
-        n.notify!(current_node, data)
+        n.async.notify!(current_node, data)
       end
     end
 
@@ -45,8 +45,12 @@ module Consensus
       @nodes.select { |n| n.id == node_id }.first
     end
 
+    def set_leader(leader)
+      @leader = leader
+    end
+
     def election?
-      !@leader
+      Celluloid::Actor[:election].on_run?
     end
 
     def current_node_is_leader?
