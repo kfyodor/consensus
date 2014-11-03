@@ -5,4 +5,4 @@ require_relative '../lib/consensus.rb'
 
 node_id = ARGV[0].to_i
 
-Consensus::Base.new(node_id).start
+Consensus::Base.new(node_id).run

@@ -37,7 +37,8 @@ module Consensus
         TCPSocket.new(@host, @port).tap do |s|
           wait_writable s
           s.puts sender.id
-        end rescue nil
+        end 
+      rescue => e
       end
     end
   end

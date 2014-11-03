@@ -3,6 +3,7 @@ require 'yaml'
 module Consensus
   class State
     include Celluloid
+    include BaseActors
 
     attr_reader :leader
 
@@ -47,6 +48,7 @@ module Consensus
 
     def set_leader(leader)
       @leader = leader
+      health.async.reset_ticks_counter!
     end
 
     def election?
@@ -57,8 +59,12 @@ module Consensus
       @leader && (@leader.id == current_node.id)
     end
 
+    def check_health?
+      @leader && (current_node.id != @leader.id) && !election?
+    end
+
     def check_leader_health
-      @leader.notify!(current_node, "PING")
+      @leader && @leader.notify!(current_node, "PING")
     end
 
     def close

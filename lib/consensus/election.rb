@@ -1,15 +1,12 @@
 module Consensus
   class Election
     include Celluloid
+    include BaseActors
 
     def initialize
       @on_run = false
       @election_counter = 0
       @response_counter = {}
-    end
-
-    def state
-      Celluloid::Actor[:state]
     end
 
     def inc_response_counter
@@ -18,9 +15,7 @@ module Consensus
 
     def inc_election_counter
       @election_counter += 1
-      @response_counter = {}.tap do |r|
-        r[@election_counter] = 0
-      end
+      @response_counter = { @election_counter => 0 }
     end
 
     def response_counter
@@ -51,7 +46,7 @@ module Consensus
         end
 
         after(1) do
-          if response_counter == 0
+          if response_counter && response_counter == 0
             state.async.broadcast "IMTHEKING"
 
             stop state.current_node

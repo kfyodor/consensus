@@ -1,13 +1,11 @@
-# Consensus::Base.new 'localhost', 9001, 1
-
 module Consensus
-  # Celluloid.task_class = Celluloid::TaskThread
 
   class Base
     include Celluloid::IO
+    include BaseActors
 
     def initialize(node_id, opts = {})
-      @node_id = node_id
+      @node_id  = node_id
       @interval = opts[:interval] || 1
       @timeout  = opts[:timeout]  || 4
 
@@ -24,42 +22,33 @@ module Consensus
       MessageHandler.supervise_as :handler
     end
 
-    def start
-      Actor[:health].async.run
-      Actor[:election].async.start
-
-      run
-    end    
-
     def run
-      loop do
-        handle_connection @server.accept
-      end
+      health.async.run
+      election.async.start
+
+      loop { handle_connection @server.accept }
     end
 
     def handle_connection(conn)
       _, port, host = conn.peeraddr
-
-      async.listen_to(handshake(conn), conn)
+      async.listen_to(conn)
     end
 
-    def handshake(conn)
+    def listen_to(conn)
       wait_readable conn
-      conn.readline.strip.to_i
-    end
+      node_id = conn.readline.strip.to_i
 
-    def listen_to(node_id, conn)
       puts "#{node_id} is now connected to #{@node_id}"
 
       loop do
         begin
           wait_readable conn
-          Actor[:handler].async.handle node_id, conn.readline.strip
+          handler.async.handle(node_id, conn.readline)
         rescue EOFError
           puts "Node #{node_id} has been disconnented"
-          conn.close
 
-          Actor[:state].node(node_id).close_socket!
+          conn.close
+          state.node(node_id).close_socket!
 
           break
         end
@@ -83,17 +72,15 @@ module Consensus
       end
 
       config["nodes"].each do |id, opts|
-        Actor[:state] << Node.new(id, opts)
+        state << Node.new(id, opts)
       end
 
-      @host = Actor[:state].current_node.host.to_s
-      @port = Actor[:state].current_node.port.to_i
+      @host = state.current_node.host.to_s
+      @port = state.current_node.port.to_i
     end
 
     def config
-      @config ||= YAML.load(
-        File.read File.expand_path 'config/nodes.yml'
-      )
+      @config ||= YAML.load(File.read File.expand_path 'config/nodes.yml')
     end
   end
 end
