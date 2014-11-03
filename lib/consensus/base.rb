@@ -11,23 +11,23 @@ module Consensus
       @interval = opts[:interval] || 1
       @timeout  = opts[:timeout]  || 4
 
-      State.supervise_as :state, @node_id
-      @state = Celluloid::Actor[:state]
-
-      HealthChecker.supervise_as :health, @interval, @timeout
-      @health_checker = Celluloid::Actor[:health]
-
-      Election.supervise_as :election
-      @election = Celluloid::Actor[:election]
-
+      init_actors
 
       parse_config
       start_server
     end
 
+    def init_actors
+      State.supervise_as :state, @node_id
+      HealthChecker.supervise_as :health, @interval, @timeout
+      Election.supervise_as :election
+      MessageHandler.supervise_as :handler
+    end
+
     def start
-      @health_checker.async.run
-      @election.async.start
+      Actor[:health].async.run
+      Actor[:election].async.start
+
       run
     end    
 
@@ -54,35 +54,15 @@ module Consensus
       loop do
         begin
           wait_readable conn
-          handle_message_from node_id, conn.readline.strip
+          Actor[:handler].async.handle node_id, conn.readline.strip
         rescue EOFError
           puts "Node #{node_id} has been disconnented"
           conn.close
-          @state.node(node_id).close_socket!
+
+          Actor[:state].node(node_id).close_socket!
 
           break
         end
-      end
-    end
-
-    def handle_message_from(node_id, data)
-      from = @state.node(node_id)
-
-      puts "Node #{node_id} -> Node #{@node_id}: #{data}"
-      puts
-
-      case data
-      when "PING"
-        from.async.notify!(@state.current_node, "PONG")
-      when "PONG"
-        @health_checker.async.report(node_id)
-      when "ALIVE?"
-        from.async.notify!(@state.current_node, "FINETHANKS")
-        @election.async.start
-      when "FINETHANKS"
-        @election.async.inc_response_counter
-      when "IMTHEKING"
-        @election.async.stop(from)
       end
     end
 
@@ -103,11 +83,11 @@ module Consensus
       end
 
       config["nodes"].each do |id, opts|
-        @state << Node.new(id, opts)
+        Actor[:state] << Node.new(id, opts)
       end
 
-      @host = @state.current_node.host.to_s
-      @port = @state.current_node.port.to_i
+      @host = Actor[:state].current_node.host.to_s
+      @port = Actor[:state].current_node.port.to_i
     end
 
     def config
