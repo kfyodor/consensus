@@ -20,7 +20,7 @@ module Consensus
         health.async.report(node_id)
       when "ALIVE?"
         from.async.notify!(current_node, "FINETHANKS")
-        election.async.start
+        election.start
       when "FINETHANKS"
         election.async.inc_response_counter
       when "IMTHEKING"

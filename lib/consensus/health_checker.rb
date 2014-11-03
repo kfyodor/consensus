@@ -1,7 +1,4 @@
 module Consensus
-
-  # checks current leader's health
-
   class HealthChecker
     include BaseActors
     include Celluloid

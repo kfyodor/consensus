@@ -16,17 +16,18 @@ module Consensus
     end
 
     def init_actors
-      State.supervise_as :state, @node_id
-      HealthChecker.supervise_as :health, @interval, @timeout
-      Election.supervise_as :election
+      State.supervise_as          :state,    @node_id
+      HealthChecker.supervise_as  :health,   @interval, @timeout
+      Election.supervise_as       :election, @interval
       MessageHandler.supervise_as :handler
     end
 
     def run
+      state.async.open_connections!
       health.async.run
       election.async.start
 
-      loop { handle_connection @server.accept }
+      loop { async.handle_connection @server.accept }
     end
 
     def handle_connection(conn)

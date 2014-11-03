@@ -30,8 +30,6 @@ module Consensus
       @socket = nil
     end
 
-    private
-
     def open_socket(sender)
       @socket ||= begin
         TCPSocket.new(@host, @port).tap do |s|

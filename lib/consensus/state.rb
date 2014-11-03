@@ -5,27 +5,30 @@ module Consensus
     include Celluloid
     include BaseActors
 
-    attr_reader :leader
+    attr_reader :leader, :current_node
 
     def initialize(node_id)
-      @node_id = node_id.freeze
-      @nodes   = []
-      @leader  = nil
+      @node_id      = node_id.freeze
+      @nodes        = {}
+      @leader       = nil
+      @current_node = nil
     end
 
     def <<(node)
-      @nodes << node
+      if node.id == @node_id
+        @current_node = node
+      else
+        @nodes[node.id] = node
+      end
     end
     alias add_node <<
 
-    def current_node
-      @current_node ||= @nodes.select do |node|
-        node.id == @node_id
-      end.first
+    def open_connections!
+      nodes.each {|n| n.open_socket(current_node) }
     end
 
     def older_nodes
-      @nodes.select do |node|
+      nodes.select do |node|
         node.id > @node_id
       end
     end
@@ -36,19 +39,20 @@ module Consensus
       end
     end
 
-    def nodes
-      @nodes.reject do |node|
-        node.id == @node_id
-      end
+    def node(node_id)
+      @nodes[node_id]
     end
 
-    def node(node_id)
-      @nodes.select { |n| n.id == node_id }.first
+    def nodes
+      @nodes.values
+    end
+
+    def all_nodes
+      nodes + [current_node]
     end
 
     def set_leader(leader)
       @leader = leader
-      health.async.reset_ticks_counter!
     end
 
     def election?
@@ -68,7 +72,7 @@ module Consensus
     end
 
     def close
-      @nodes.each do |n|
+      all_nodes.each do |n|
         n.socket.close if n.socket
       end 
     end
