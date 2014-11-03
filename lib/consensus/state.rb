@@ -2,6 +2,10 @@ require 'yaml'
 
 module Consensus
   class State
+    #  Holds system's state: connected nodes, 
+    #  leader, current node and communication
+    #  helpers
+
     include Celluloid
     include BaseActors
 

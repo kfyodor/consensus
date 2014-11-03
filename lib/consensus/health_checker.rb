@@ -1,12 +1,20 @@
 module Consensus
   class HealthChecker
+    #  Checks leader's health
+
     include BaseActors
     include Celluloid
 
     class HealthReport
+      # Data structure for checking
+      # health responses from the leader
+      # within a given timeout.
+      # Some kind of a ring buffer etc.
+
+      attr_reader :ticks_count, :report
+
       def initialize(timeout)
         @timeout  = timeout
-
         reset!
       end
 
@@ -15,8 +23,8 @@ module Consensus
       end
 
       def reset!
-        @ticks_count   = 0
-        @report = {}
+        @ticks_count = 0
+        @report      = {}
       end
 
       def inc!
@@ -30,7 +38,7 @@ module Consensus
 
       def has_backlog?
         backlog.size >= @timeout
-    end
+      end
 
       def backlog
         @report.values_at(*(range_start..range_end).to_a)
@@ -57,7 +65,7 @@ module Consensus
       end
 
       def range_end
-        @ticks_count
+        @ticks_count - 1
       end
     end
 
