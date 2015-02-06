@@ -1,6 +1,5 @@
 #!/usr/bin/env ruby
 
-require 'yaml'
 require_relative '../lib/consensus.rb'
 
 node_id = ARGV[0].to_i
